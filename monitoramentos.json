@@ -1,0 +1,11 @@
+[
+  {
+    "id": "test_monitor",
+    "cnj": "1100617-68.2025.8.26.0100",
+    "email": "euruansantoos@gmail.com",
+    "nomeCliente": "Cliente de Teste",
+    "frequencia": "1h",
+    "ativo": true,
+    "ultimaMovimentacaoConhecida": "2024-01-01T00:00:00Z"
+  }
+]

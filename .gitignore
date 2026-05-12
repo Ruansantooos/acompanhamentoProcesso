@@ -1,0 +1,15 @@
+node_modules/
+.next/
+dist/
+build/
+*.log
+.env
+debug_esaj.png
+esaj-test.png
+esaj-test2.png
+temp_repo/
+resultado_teste.*
+git_code/
+.claude/
+node_modules
+node_modules
