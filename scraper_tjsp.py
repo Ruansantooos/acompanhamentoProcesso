@@ -141,7 +141,7 @@ def consultar_esaj(numero_cnj):
         botao.click()
         time.sleep(10)
 
-        # Fallback "Outros" no e-SAJ
+        # Verifica se estamos na página de detalhes do processo no e-SAJ
         if "Não existem informações disponíveis" in driver.page_source or "numeroDigitoAnoUnificado" in driver.page_source:
             print("[*] Não encontrado na busca padrão e-SAJ. Tentando modo 'Outros'...")
             driver.get(url)
@@ -160,17 +160,15 @@ def consultar_esaj(numero_cnj):
             except:
                 pass
 
-        # ─── TENTATIVA 2: EPROC (Se e-SAJ falhou) ───
+        # Se ainda não estiver na página de detalhes, tenta EPROC
         if "Não existem informações disponíveis" in driver.page_source or "numeroDigitoAnoUnificado" in driver.page_source:
             eproc_res = scrape_eproc(numero_cnj, driver)
             if eproc_res:
                 return eproc_res
+            else:
+                return {"error": "Processo não encontrado nos sistemas TJSP (e-SAJ/EPROC)"}
 
-        # Se após tudo não encontrou
-        if "Não existem informações disponíveis" in driver.page_source or "numeroDigitoAnoUnificado" in driver.page_source:
-            return {"error": "Processo não encontrado nos sistemas TJSP (e-SAJ/EPROC)"}
-
-        # Extração de dados (e-SAJ)
+        # Extração de dados (e-SAJ) - Se chegou aqui, é porque encontrou no e-SAJ
         html = driver.page_source
         soup = BeautifulSoup(html, 'html.parser')
         
