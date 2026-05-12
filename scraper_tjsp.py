@@ -31,9 +31,9 @@ def scrape_eproc(numero_cnj, driver):
         
         # Tenta localizar o campo de número do processo
         try:
-            campo = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "txtNumeroProcesso")))
+            campo = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "txtNumProcesso")))
         except:
-            campo = driver.find_element(By.NAME, "txtNumeroProcesso")
+            campo = driver.find_element(By.NAME, "txtNumProcesso")
             
         campo.clear()
         campo.send_keys(numero_cnj)
