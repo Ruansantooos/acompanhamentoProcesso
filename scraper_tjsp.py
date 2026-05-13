@@ -27,69 +27,78 @@ def scrape_eproc(numero_cnj, driver):
     try:
         print(f"[*] Buscando no EPROC: {numero_cnj}")
         driver.get("https://eproc-consulta.tjsp.jus.br/consulta_1g/externo_controlador.php?acao=tjsp@consulta_unificada_publica/consultar")
-        time.sleep(5)
         
-        # Tenta localizar o campo de número do processo
-        try:
-            campo = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "txtNumProcesso")))
-        except:
+        wait = WebDriverWait(driver, 15)
+        
+        # Tenta localizar o campo de número do processo com múltiplos seletores
+        campo = None
+        for selector in ["txtNumProcesso", "txtNumeroProcesso", "txtProcesso"]:
+            try:
+                campo = wait.until(EC.presence_of_element_located((By.ID, selector)))
+                if campo: break
+            except: continue
+        
+        if not campo:
             campo = driver.find_element(By.NAME, "txtNumProcesso")
             
         campo.clear()
         campo.send_keys(numero_cnj)
         
-        print("[*] Aguardando 5s para o CAPTCHA do EPROC...")
-        time.sleep(5)
-        
         # Clica em Consultar
-        try:
-            botao = driver.find_element(By.ID, "btnConsultar")
-        except:
+        botao = None
+        for selector in ["btnConsultar", "btnPesquisar"]:
+            try:
+                botao = driver.find_element(By.ID, selector)
+                if botao: break
+            except: continue
+            
+        if not botao:
             botao = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
             
         botao.click()
-        time.sleep(10)
+        
+        # Aguarda a página de resultados carregar (procura pela tabela de eventos ou mensagem de erro)
+        try:
+            wait.until(lambda d: "tabelaEventos" in d.page_source or "Nenhum registro encontrado" in d.page_source or "Resultado da Consulta" in d.page_source)
+        except:
+            time.sleep(5) # Fallback
         
         if "Nenhum registro encontrado" in driver.page_source:
             return None
             
-        # Extração básica
-        html = driver.page_source
-        soup = BeautifulSoup(html, 'html.parser')
+        # Extração de dados
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
         
-        # No EPROC as informações são estruturadas de forma diferente
-        # Tentamos pegar o cabeçalho
         classe = "N/A"
         assunto = "N/A"
         
-        # Procura por labels comuns no EPROC
-        for label in soup.find_all("label"):
+        # No EPROC, as informações costumam estar em labels seguidos de spans ou em tabelas
+        for label in soup.find_all(["label", "th"]):
             txt = label.get_text().strip()
             if "Classe" in txt:
-                parent = label.find_parent("div") or label.find_parent("td")
-                if parent:
-                    classe = parent.get_text().replace(txt, "").strip()
+                val = label.find_next(["span", "td", "div"])
+                if val: classe = val.get_text().strip()
             elif "Assunto" in txt:
-                parent = label.find_parent("div") or label.find_parent("td")
-                if parent:
-                    assunto = parent.get_text().replace(txt, "").strip()
+                val = label.find_next(["span", "td", "div"])
+                if val: assunto = val.get_text().strip()
 
         movimentacoes = []
-        # Tabela de eventos típica do EPROC (TRF4/TJSP)
         tabela = soup.find("table", {"id": "tabelaEventos"})
         if tabela:
-            for tr in tabela.find_all("tr")[1:11]: # Top 10
+            for tr in tabela.find_all("tr")[1:15]: # Pega até as 14 últimas
                 tds = tr.find_all("td")
                 if len(tds) >= 3:
-                    movimentacoes.append({
-                        "data": tds[1].get_text().strip(),
-                        "descricao": tds[2].get_text().strip()
-                    })
+                    data = tds[1].get_text().strip()
+                    desc = tds[2].get_text().strip()
+                    # Limpa espaços excessivos
+                    desc = " ".join(desc.split())
+                    movimentacoes.append({"dataHora": data, "nome": desc})
             
         return {
             "numero": numero_cnj,
             "classe": classe,
             "assunto": assunto,
+            "partes": [], # TODO: Implementar extração de partes no EPROC se necessário
             "movimentacoes": movimentacoes,
             "fonte": "EPROC-TJSP"
         }
@@ -100,7 +109,6 @@ def scrape_eproc(numero_cnj, driver):
 def consultar_esaj(numero_cnj):
     """
     Consulta um processo no e-SAJ do TJSP usando o número CNJ.
-    Retorna um dicionário com classe, partes e movimentações.
     """
     clean = numero_cnj.replace("-", "").replace(".", "")
     if len(clean) != 20:
@@ -111,7 +119,9 @@ def consultar_esaj(numero_cnj):
     foro = clean[16:20]
 
     options = uc.ChromeOptions()
-    # options.add_argument('--headless') # Headless costuma falhar mais em passar bot detection
+    if os.environ.get('HEADLESS_MODE') == 'true':
+        options.add_argument('--headless')
+    
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--window-size=1920,1080')
@@ -121,56 +131,54 @@ def consultar_esaj(numero_cnj):
         driver = uc.Chrome(options=options)
         wait = WebDriverWait(driver, 20)
 
-        # ─── TENTATIVA 1: e-SAJ ───
+        # ─── TENTATIVA 1: e-SAJ (Consulta Padrão) ───
         url = "https://esaj.tjsp.jus.br/cpopg/open.do"
         driver.get(url)
-        time.sleep(7)
+        
+        try:
+            campo_numero = wait.until(EC.presence_of_element_located((By.ID, "numeroDigitoAnoUnificado")))
+            campo_numero.clear()
+            campo_numero.send_keys(primeira_parte)
 
-        campo_numero = wait.until(EC.presence_of_element_located((By.ID, "numeroDigitoAnoUnificado")))
-        campo_numero.clear()
-        campo_numero.send_keys(primeira_parte)
+            campo_foro = driver.find_element(By.ID, "foroNumeroUnificado")
+            campo_foro.clear()
+            campo_foro.send_keys(foro)
 
-        campo_foro = driver.find_element(By.ID, "foroNumeroUnificado")
-        campo_foro.clear()
-        campo_foro.send_keys(foro)
+            botao = driver.find_element(By.ID, "botaoConsultarProcessos")
+            botao.click()
+            
+            # Aguarda resultado ou erro
+            wait.until(lambda d: "classeProcesso" in d.page_source or "Não existem informações disponíveis" in d.page_source or "Mensagem" in d.page_source)
+        except Exception as e:
+            print(f"[*] Falha na busca inicial e-SAJ: {e}")
 
-        print("[*] Aguardando 5s para o CAPTCHA (e-SAJ)...")
-        time.sleep(5)
-
-        botao = driver.find_element(By.ID, "botaoConsultarProcessos")
-        botao.click()
-        time.sleep(10)
-
-        # Verifica se estamos na página de detalhes do processo no e-SAJ
+        # Se não encontrou na primeira tentativa, tenta modo "Outros" (CNJ Completo)
         if "Não existem informações disponíveis" in driver.page_source or "numeroDigitoAnoUnificado" in driver.page_source:
-            print("[*] Não encontrado na busca padrão e-SAJ. Tentando modo 'Outros'...")
+            print("[*] Não encontrado na busca padrão e-SAJ. Tentando via CNJ completo...")
             driver.get(url)
-            time.sleep(5)
             try:
                 radio_outros = wait.until(EC.element_to_be_clickable((By.ID, "radioOutros")))
                 radio_outros.click()
-                time.sleep(2)
-                campo_outros = driver.find_element(By.ID, "dadosConsulta.valorConsulta")
+                campo_outros = wait.until(EC.presence_of_element_located((By.ID, "dadosConsulta.valorConsulta")))
                 campo_outros.clear()
                 campo_outros.send_keys(numero_cnj)
-                time.sleep(5)
-                botao = driver.find_element(By.ID, "botaoConsultarProcessos")
-                botao.click()
-                time.sleep(10)
-            except:
-                pass
+                driver.find_element(By.ID, "botaoConsultarProcessos").click()
+                
+                # Aguarda resultado
+                wait.until(lambda d: "classeProcesso" in d.page_source or "Não existem informações disponíveis" in d.page_source)
+            except: pass
 
-        # Se ainda não estiver na página de detalhes, tenta EPROC
+        # Se ainda não encontrou, tenta EPROC
         if "Não existem informações disponíveis" in driver.page_source or "numeroDigitoAnoUnificado" in driver.page_source:
+            print("[*] Tentando fallback para o sistema EPROC...")
             eproc_res = scrape_eproc(numero_cnj, driver)
             if eproc_res:
                 return eproc_res
             else:
                 return {"error": "Processo não encontrado nos sistemas TJSP (e-SAJ/EPROC)"}
 
-        # Extração de dados (e-SAJ) - Se chegou aqui, é porque encontrou no e-SAJ
-        html = driver.page_source
-        soup = BeautifulSoup(html, 'html.parser')
+        # Extração de dados (e-SAJ)
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
         
         classe = soup.find(id="classeProcesso").get_text().strip() if soup.find(id="classeProcesso") else "N/A"
         assunto = soup.find(id="assuntoProcesso").get_text().strip() if soup.find(id="assuntoProcesso") else "N/A"
@@ -178,18 +186,19 @@ def consultar_esaj(numero_cnj):
         movimentacoes = []
         tabela_movs = soup.find(id="tabelaTodasMovimentacoes") or soup.find(id="tabelaUltimasMovimentacoes")
         if tabela_movs:
-            linhas = tabela_movs.find_all("tr")
-            for linha in linhas[:10]: # Top 10
+            for linha in tabela_movs.find_all("tr")[:15]:
                 tds = linha.find_all("td")
                 if len(tds) >= 2:
                     data = tds[0].get_text().strip()
-                    descricao = tds[2].get_text().strip() if len(tds) > 2 else tds[1].get_text().strip()
-                    movimentacoes.append({"data": data, "descricao": descricao})
+                    desc = tds[2].get_text().strip() if len(tds) > 2 else tds[1].get_text().strip()
+                    desc = " ".join(desc.split())
+                    movimentacoes.append({"dataHora": data, "nome": desc})
 
         return {
             "numero": numero_cnj,
             "classe": classe,
             "assunto": assunto,
+            "partes": [], # TODO: Implementar extração de partes no e-SAJ
             "movimentacoes": movimentacoes,
             "fonte": "e-SAJ-TJSP"
         }
