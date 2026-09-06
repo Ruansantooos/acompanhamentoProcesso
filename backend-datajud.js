@@ -5,7 +5,12 @@ const cron = require('node-cron');
 const nodemailer = require('nodemailer');
 const { initializeApp } = require("firebase/app");
 const { getFirestore, collection, getDocs, setDoc, doc, deleteDoc } = require("firebase/firestore");
-const { scrapeTJSP } = require('./scraper-tjsp');
+// Na Vercel não há Python nem Chrome via apt (ambiente serverless), então usamos
+// o robô em puppeteer-core+@sparticuz/chromium; fora da Vercel (Railway/Render/local)
+// mantemos o robô Python+Selenium original.
+const { scrapeTJSP } = process.env.VERCEL
+    ? require('./scraper-tjsp-vercel')
+    : require('./scraper-tjsp');
 
 const fs = require('fs');
 const path = require('path');
@@ -341,6 +346,11 @@ Movimentações recentes:\n${ultimasMovs}`;
 }
 
 function iniciarJob(monitor) {
+    // Em serverless (Vercel) cada invocação sobe e morre — um cron em memória
+    // nunca chega a disparar. As verificações passam a ser só sob demanda
+    // (rota /api/monitoramento/:id/verificar).
+    if (process.env.VERCEL) return;
+
     const expr = buildCronExpression(monitor.horario, monitor.frequencia);
     if (!expr || !cron.validate(expr)) {
         console.warn(`[CRON] Expressão inválida para monitor ${monitor.id}: "${expr}"`);
@@ -564,9 +574,15 @@ app.get('/api/test-notification', async (req, res) => {
     }
 });
 
-const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => {
-    console.log(`Servidor rodando em http://localhost:${PORT}`);
-    console.log(`Configure EMAIL_USER e EMAIL_PASS para envio de notificações.`);
-    inicializarJobs();
-});
+// Na Vercel a Express app é exportada e chamada pelo runtime serverless
+// (ver api/index.js) — não deve fazer app.listen() nem manter cron em memória.
+if (!process.env.VERCEL) {
+    const PORT = process.env.PORT || 8000;
+    app.listen(PORT, () => {
+        console.log(`Servidor rodando em http://localhost:${PORT}`);
+        console.log(`Configure EMAIL_USER e EMAIL_PASS para envio de notificações.`);
+        inicializarJobs();
+    });
+}
+
+module.exports = app;
