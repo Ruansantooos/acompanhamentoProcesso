@@ -18,7 +18,8 @@ async function scrapeTJSP(cnj) {
     return new Promise((resolve, reject) => {
         console.log(`[ROBÔ-PY] Executando scraper Python para ${formatted}...`);
 
-        const proc = execFile('python', ['-u', scriptPath, formatted], {
+        const pythonBin = process.env.PYTHON_BIN || (process.platform === 'win32' ? 'python' : 'python3');
+        const proc = execFile(pythonBin, ['-u', scriptPath, formatted], {
             timeout: 90000, // 90 segundos de timeout
             maxBuffer: 1024 * 1024 * 5, // 5MB de buffer
             cwd: __dirname,

@@ -564,7 +564,7 @@ app.get('/api/test-notification', async (req, res) => {
     }
 });
 
-const PORT = 8000;
+const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT}`);
     console.log(`Configure EMAIL_USER e EMAIL_PASS para envio de notificações.`);

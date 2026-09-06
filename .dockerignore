@@ -1,0 +1,12 @@
+node_modules
+.git
+.env
+*.log
+debug_esaj.png
+esaj-test.png
+esaj-test2.png
+temp_repo
+resultado_teste.*
+git_code
+.claude
+cockpit

@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: acompanhamento-processo
+    env: docker
+    plan: starter
+    envVars:
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

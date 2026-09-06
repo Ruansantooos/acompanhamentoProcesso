@@ -13,3 +13,6 @@ git_code/
 .claude/
 node_modules
 node_modules
+
+__pycache__/
+*.pyc

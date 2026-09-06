@@ -128,7 +128,8 @@ def consultar_esaj(numero_cnj):
 
     driver = None
     try:
-        driver = uc.Chrome(options=options)
+        chrome_bin = os.environ.get('CHROME_BIN')
+        driver = uc.Chrome(options=options, browser_executable_path=chrome_bin) if chrome_bin else uc.Chrome(options=options)
         wait = WebDriverWait(driver, 20)
 
         # ─── TENTATIVA 1: e-SAJ (Consulta Padrão) ───
