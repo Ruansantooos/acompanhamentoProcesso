@@ -13,3 +13,12 @@ git_code/
 .claude/
 node_modules
 node_modules
+
+# O painel Next.js vive em seu proprio repositorio
+cockpit/
+
+# Banco local do worker: dado de execucao, com e-mail de cliente
+monitoramentos.json
+
+# Cache de bytecode do Python
+__pycache__/

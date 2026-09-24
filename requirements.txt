@@ -1,0 +1,10 @@
+# Dependências dos robôs de consulta processual (scraper_tjsp.py, scraper_eproc.py).
+# Instalação: pip install -r requirements.txt
+#
+# Requer também o Google Chrome instalado na máquina. O undetected-chromedriver
+# baixa o driver correspondente; a versão do Chrome é detectada em tempo de
+# execução (ver versao_chrome_instalada() em scraper_tjsp.py).
+
+undetected-chromedriver==3.5.5
+selenium==4.43.0
+beautifulsoup4==4.14.3

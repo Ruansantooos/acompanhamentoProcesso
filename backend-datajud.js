@@ -1,3 +1,16 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// NOVO PAPEL DESTE SERVIÇO: WORKER DE SCRAPING
+//
+// Após a migração para o Next.js (pasta cockpit/), o CRM, o monitoramento, o
+// cron, as notificações e a IA passaram a viver no Next.js + Firestore.
+// Este serviço Express agora serve essencialmente o endpoint de scraping:
+//
+//     GET /processos/:cnj   → extrai movimentações/partes direto do tribunal
+//
+// O Next.js o consome via a variável de ambiente API_URL. As rotas de
+// monitoramento/cron abaixo permanecem por compatibilidade, mas estão
+// DEPRECADAS — a fonte da verdade agora é o Next.js. Evite usá-las.
+// ─────────────────────────────────────────────────────────────────────────────
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -519,6 +532,12 @@ app.post('/api/monitoramento/:id/verificar', async (req, res) => {
 });
 
 // Remover monitoramento
+app.delete('/api/monitoramento/:id', async (req, res) => {
+    pararJob(req.params.id);
+    await deleteDoc(doc(db, "monitoramentos", req.params.id));
+    res.json({ ok: true });
+});
+
 app.delete('/monitoramentos/:id', async (req, res) => {
     pararJob(req.params.id);
     await deleteDoc(doc(db, "monitoramentos", req.params.id));
